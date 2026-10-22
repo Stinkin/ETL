@@ -1,0 +1,10 @@
+key|folder|filename_pattern|mode 
+maestros|data/raw|ETL - Maestro.xlsx|UNIQUE
+homologacion|data/raw|ETL - Homologacion.xlsx|UNIQUE
+mapeotareas|data/raw|Mapeo Tarea-Clasificacion.xlsx|UNIQUE
+mapeorequerimiento|data/raw|Mapeo Requerimiento-Proyecto.xlsx|UNIQUE
+registroplanificacion|data/raw|Recursos - Planificacion.xlsx|UNIQUE
+recurosdisponibilidad|data/raw|Recursos - Disponibilidad.xlsx|UNIQUE
+proyectos|data/raw|DTI 2026 - *.xlsx|LAST
+horas|data/raw|Reporte Kairos *.xlsx|LAST
+servicedesk | data/raw | DTI-Calidad*.xlsx| ALL

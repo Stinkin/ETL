@@ -1,0 +1,2 @@
+archivoproyect | C:\Users\I0604941\Desktop\Kimball\data\raw | DTI 202*.mpp | LAST
+bajadaasignacion | data/processed | bajadaproyectos.parquet | UNIQUE
