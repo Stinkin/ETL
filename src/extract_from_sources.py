@@ -302,8 +302,7 @@ def read_all_files(dataset_key: str, file_list: list[str]) -> dict[str, list[pd.
         return buffer
 
     for file_path in file_list:
-        timestamp = os.path.getmtime(file_path)
-        file_date = pd.to_datetime(timestamp, unit='s').normalize()
+        file_date = datetime.fromtimestamp(os.path.getmtime(file_path)).strftime("%Y-%m-%d %H:%M:%S")
         for key_name, df in read_single_file(file_path, dataset_key).items():
             df_new = df.copy()
             df_new["FileDate"] = file_date

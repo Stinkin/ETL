@@ -11,7 +11,7 @@ def _to_datetime_text(series: pd.Series) -> pd.Series:
     dt_series = pd.to_datetime(clean_dates, format="%d/%m/%y", errors="coerce")
     return dt_series
 
-def _to_datetime(series: pd.Series) -> pd.Series:
+def _to_datetimeSD(series: pd.Series) -> pd.Series:
     """
     Normaliza fechas y las convierte a datetime.
 
@@ -1002,7 +1002,7 @@ def _build_fact_sd(clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd
     df_raw = df_raw[df_raw[COL_MAP] != EQUIPO_EXCLUIDO]
     logging.info(f"⚙️ [FactSD] {n_antes - len(df_raw)} registro(s) eliminados.")
 
-    df_raw["Fecha"] = _to_datetime(df_raw["Fecha de cierre"])
+    df_raw["Fecha"] = _to_datetimeSD(df_raw["Fecha de cierre"])
 
     df_fact = df_raw[COLS_RAW + [COL_MAP] + ["Fecha"]]
 
@@ -1034,7 +1034,7 @@ def _build_fact_acumulado_proyectos(clean_data: dict[str, pd.DataFrame], dimensi
     df = _process_proyect_files(data, process_name)
 
 
-    return df.reset_index(drop=True)
+    return df
 
 def _build_fact_seguimiento_proyecto(clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]) -> pd.DataFrame:
     process_name = "FactSeguimientoProyecto"
@@ -1067,13 +1067,14 @@ def _build_fact_seguimiento_proyecto(clean_data: dict[str, pd.DataFrame], dimens
 
     data={}
     df_raw["FileDate"] = fecha_snapshot
+    df_raw["FileDate"] = df_raw["FileDate"].astype("string")
     data["Proyectos"] = df_raw
     data["DimProyectoEstado"] = dimensions["DimProyectoEstado"]
     data["DimProyectoSituacion"] = dimensions["DimProyectoSituacion"]
 
     df = _process_proyect_files(data, process_name)
 
-    return df.reset_index(drop=True)
+    return df
 
 def _process_proyect_files( dimensions: dict[str, pd.DataFrame], process: str) -> pd.DataFrame:
 
@@ -1099,7 +1100,7 @@ def _process_proyect_files( dimensions: dict[str, pd.DataFrame], process: str) -
 
     # 3. Mapeo de Atributos Base y Fechas (YYYYMMDD)
     df["KeyProyecto"] = df["Cod Proy."]
-    df["FechaSnapshot"] = df["FileDate"]
+    df["FechaSnapshot"] = pd.to_datetime(df["FileDate"], errors="coerce")
     df["FechaInicioPlan"] = _to_datetime_text(df["Comienzo_Programado"])
     df["FechaFinPlan"] = _to_datetime_text(df["Fin_Programo"])
     df["FechaInicioReal"] = _to_datetime_text(df["Comienzo"])
@@ -1147,7 +1148,7 @@ def _process_proyect_files( dimensions: dict[str, pd.DataFrame], process: str) -
     # Mapeo final a KeyProyectoEstado
     df["KeyProyectoEstado"] = estado_final_str.map(estado_map)
 
-    # 6. KeyProyectoSituacion (Pandas Nativo con resguardo contra fechas -1)
+    # 6. KeyProyectoSituacion (Basado en el Estado del Proyecto)
     dim_situacion = dimensions.get("DimProyectoSituacion", pd.DataFrame())
     situacion_map = (
         dict(
@@ -1160,37 +1161,36 @@ def _process_proyect_files( dimensions: dict[str, pd.DataFrame], process: str) -
         else {}
     )
 
-    pct = df["PorcentajeDeAvance"]
     snap = df["FechaSnapshot"]
     ini_p = df["FechaInicioPlan"]
     fin_p = df["FechaFinPlan"]
     fin_r = df["FechaFinReal"]
 
-    valid_ini_p = ini_p != 0
-    valid_fin_p = fin_p != 0
+    valid_ini_p = ini_p.notna()
+    valid_fin_p = fin_p.notna()
+    valid_fin_r = (fin_r != "") & fin_r.notna()
 
-    temp_situaciones = pd.Series("en fecha", index=df.index)
+    # 1. Partimos de la base de que todo está "en fecha" por defecto
+    temp_situaciones = pd.Series("En Fecha", index=df.index)
 
-    # Caso A: Porcentaje == 0
-    m_pct_0 = pct == 0
-    temp_situaciones.loc[m_pct_0 & valid_ini_p & (snap > ini_p)] = "atrasado"
-
-    # Caso B: Porcentaje == 1
-    m_pct_1 = pct == 1
-    temp_situaciones.loc[m_pct_1] = "atrasado"
+    # 2. Aplicamos las excepciones según el estado
     temp_situaciones.loc[
-        m_pct_1 & (fin_r != "") & valid_fin_p & (fin_r <= fin_p)
-    ] = "en fecha"
+        (estado_final_str == "Sin Iniciar") & valid_ini_p & (snap > ini_p)
+    ] = "Demorado"
 
-    # Caso C: 0 < Porcentaje < 1
-    m_pct_mid = (pct > 0) & (pct < 1)
-    temp_situaciones.loc[m_pct_mid & valid_ini_p & (snap < ini_p)] = (
-        "adelantado"
-    )
-    temp_situaciones.loc[m_pct_mid & valid_fin_p & (snap > fin_p)] = (
-        "atrasado"
-    )
+    temp_situaciones.loc[
+        (estado_final_str == "En Proceso") & valid_fin_p & (snap > fin_p)
+    ] = "Demorado"
 
+    temp_situaciones.loc[
+        (estado_final_str == "En Proceso") & valid_ini_p & (snap < ini_p)
+    ] = "adelantado"
+
+    temp_situaciones.loc[
+        (estado_final_str == "Terminado") & valid_fin_p & valid_fin_r & (fin_r > fin_p)
+    ] = "Demorado"
+
+    # 3. Mapeo final a Key
     df["KeyProyectoSituacion"] = (
         temp_situaciones.map(situacion_map).fillna(0).astype(int)
     )
