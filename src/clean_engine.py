@@ -102,6 +102,7 @@ def capitalize_fields(input_df:dict[str, pd.DataFrame]) -> dict[str, pd.DataFram
         "DimTarea":{"KeyProyecto"},
         "DimRecursoOrigen":{"RecursoOrigen"},
         "FactSeguimientoProyecto":{"KeyProyecto"},
+        "FactSeguimientoProyectoAcumulado":{"KeyProyecto"},
         "FactSD":{"Equipo"},
     }
 

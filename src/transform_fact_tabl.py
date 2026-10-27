@@ -53,7 +53,7 @@ def _to_datetime(series: pd.Series) -> pd.Series:
         errors="coerce"
     )
 
-def _build_fact_seguimiento_proyecto(clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]) -> pd.DataFrame:
+def _build_fact_seguimiento_proyectoN(clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     logging.info("⚙️ Construyendo [FactSeguimientoProyecto]...")
     pending_items: list[str] = []
@@ -1012,6 +1012,212 @@ def _build_fact_sd(clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd
 
     return df_fact
 
+def _build_fact_acumulado_proyectos(clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame],) -> pd.DataFrame:
+    process_name = "FactSeguimientoProyectoAcumulado"
+    logging.info(f"⚙️ Construyendo [{process_name}]...")    
+    
+    pending_items = []
+    df_raw = clean_data.get("AcumuladoProyectos", pd.DataFrame()).copy()
+      
+    if df_raw.empty:
+        logging.warning(
+            f"⚠️ [{process_name}] AcumuladoProyectos está vacía."
+        )
+        _generate_logs(f"[{process_name}]", pending_items)
+        return pd.DataFrame()
+    
+    data = {}
+    data["Proyectos"] = df_raw
+    data["DimProyectoEstado"] = dimensions["DimProyectoEstado"]
+    data["DimProyectoSituacion"] = dimensions["DimProyectoSituacion"]
+
+    df = _process_proyect_files(data, process_name)
+
+
+    return df.reset_index(drop=True)
+
+def _build_fact_seguimiento_proyecto(clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    process_name = "FactSeguimientoProyecto"
+    logging.info(f"⚙️ Construyendo [{process_name}]...")    
+    
+    pending_items: list[str] = []
+    df_raw = clean_data.get("BajadaProyectos", pd.DataFrame()).copy()
+      
+    if df_raw.empty:
+        logging.warning(
+            f"⚠️ [{process_name}] BajadaProyectos está vacía."
+        )
+        _generate_logs(f"[{process_name}]", pending_items)
+        return pd.DataFrame()
+
+    # Obtención segura de FechaSnapshot
+    df_file_info = clean_data.get("FactFileInfo", pd.DataFrame())
+    fecha_snapshot = 0
+    if not df_file_info.empty and "Alias" in df_file_info.columns:
+        match_snap = df_file_info.loc[
+            df_file_info["Alias"] == "Proyectos", "FechaSnapshot"
+        ]
+        if not match_snap.empty:
+            fecha_snapshot = match_snap.item()
+
+    if fecha_snapshot == 0:
+        msg = "No se encontró FechaSnapshot para 'Proyectos' en FactFileInfo. Se asigna 0 por defecto."
+        logging.warning(f"⚠️ [{process_name}] {msg}")
+        pending_items.append(msg)
+
+    data={}
+    df_raw["FileDate"] = fecha_snapshot
+    data["Proyectos"] = df_raw
+    data["DimProyectoEstado"] = dimensions["DimProyectoEstado"]
+    data["DimProyectoSituacion"] = dimensions["DimProyectoSituacion"]
+
+    df = _process_proyect_files(data, process_name)
+
+    return df.reset_index(drop=True)
+
+def _process_proyect_files( dimensions: dict[str, pd.DataFrame], process: str) -> pd.DataFrame:
+
+    pending_items: list[str] = []
+
+    # 1. Lectura segura con .get() (preserva trazabilidad)
+    df_raw = dimensions.get("Proyectos", pd.DataFrame()).copy()
+
+    # 2. Filtrado de registros válidos
+    mask_valid = (
+        (df_raw["Proyecto"] != "NO")
+        & df_raw["Proyecto"].notna()
+        & (df_raw["Proyecto"] != "")
+    )
+    df = df_raw[mask_valid].copy()
+
+    if df.empty:
+        logging.warning(
+            f"⚠️ [{process}] No quedan registros tras aplicar filtros de validez."
+        )
+        _generate_logs(f"{process}", pending_items)
+        return pd.DataFrame()
+
+    # 3. Mapeo de Atributos Base y Fechas (YYYYMMDD)
+    df["KeyProyecto"] = df["Cod Proy."]
+    df["FechaSnapshot"] = df["FileDate"]
+    df["FechaInicioPlan"] = _to_datetime_text(df["Comienzo_Programado"])
+    df["FechaFinPlan"] = _to_datetime_text(df["Fin_Programo"])
+    df["FechaInicioReal"] = _to_datetime_text(df["Comienzo"])
+    df["FechaFinReal"] = _to_datetime_text(df["Fin"])
+
+    # 4. Métricas Numéricas Vectorizadas
+    clean_hours = (
+        df["Trabajo"]
+        .astype(str)
+        .str.replace(", ", ",", regex=False)
+        .str.split(" ")       # 1. Separamos primero por espacio para quitar "horas"
+        .str[0]
+        .str.replace(".", "", regex=False)  # 2. Eliminamos el punto de los miles (1.187 -> 1187)
+        .str.replace(",", ".", regex=False)  # 3. Cambiamos la coma decimal por punto (1187,51 -> 1187.51)
+    )
+
+    df["HorasPlanificadas"] = (
+        pd.to_numeric(clean_hours, errors="coerce").fillna(0.0).round().astype(int)
+    )
+
+    pct_raw = df["% trabajo completado"]
+    df["PorcentajeDeAvance"] = (
+        pct_raw.mask(pct_raw > 1.0, pct_raw / 100.0).round(2)
+    )
+    df["CantidadReplanificaciones"] = df["Cant. Reprogramaciones"]
+    # 5. KeyProyectoEstado
+
+    # Diccionario de mapeo Texto -> Key
+    dim_estado = dimensions["DimProyectoEstado"]
+    estado_map = dict(zip(dim_estado["ProyectoEstado"], dim_estado["KeyProyectoEstado"]))
+
+    # Identificar registros con estado determinado por porcentaje ("SI")
+    es_por_porcentaje = df["Proyecto"] == "Si"
+    estado_explicito = df["Proyecto"].where(~es_por_porcentaje)
+
+    # Cálculo del texto de estado por porcentaje de avance
+    pct = df["PorcentajeDeAvance"]
+    calc_estado = pd.Series("Sin Iniciar", index=df.index)
+    calc_estado.loc[pct >= 1] = "Terminado"
+    calc_estado.loc[(pct > 0) & (pct < 1)] = "En Proceso"
+
+    # Resolución del texto de estado final
+    estado_final_str = estado_explicito.fillna(calc_estado)
+
+    # Mapeo final a KeyProyectoEstado
+    df["KeyProyectoEstado"] = estado_final_str.map(estado_map)
+
+    # 6. KeyProyectoSituacion (Pandas Nativo con resguardo contra fechas -1)
+    dim_situacion = dimensions.get("DimProyectoSituacion", pd.DataFrame())
+    situacion_map = (
+        dict(
+            zip(
+                dim_situacion["ProyectoSituacion"],
+                dim_situacion["KeyProyectoSituacion"],
+            )
+        )
+        if not dim_situacion.empty
+        else {}
+    )
+
+    pct = df["PorcentajeDeAvance"]
+    snap = df["FechaSnapshot"]
+    ini_p = df["FechaInicioPlan"]
+    fin_p = df["FechaFinPlan"]
+    fin_r = df["FechaFinReal"]
+
+    valid_ini_p = ini_p != 0
+    valid_fin_p = fin_p != 0
+
+    temp_situaciones = pd.Series("en fecha", index=df.index)
+
+    # Caso A: Porcentaje == 0
+    m_pct_0 = pct == 0
+    temp_situaciones.loc[m_pct_0 & valid_ini_p & (snap > ini_p)] = "atrasado"
+
+    # Caso B: Porcentaje == 1
+    m_pct_1 = pct == 1
+    temp_situaciones.loc[m_pct_1] = "atrasado"
+    temp_situaciones.loc[
+        m_pct_1 & (fin_r != "") & valid_fin_p & (fin_r <= fin_p)
+    ] = "en fecha"
+
+    # Caso C: 0 < Porcentaje < 1
+    m_pct_mid = (pct > 0) & (pct < 1)
+    temp_situaciones.loc[m_pct_mid & valid_ini_p & (snap < ini_p)] = (
+        "adelantado"
+    )
+    temp_situaciones.loc[m_pct_mid & valid_fin_p & (snap > fin_p)] = (
+        "atrasado"
+    )
+
+    df["KeyProyectoSituacion"] = (
+        temp_situaciones.map(situacion_map).fillna(0).astype(int)
+    )
+
+    # 7. Selección de Columnas del Grano Final
+    cols_finales = [
+        "KeyProyecto",
+        "FechaSnapshot",
+        "FechaInicioPlan",
+        "FechaFinPlan",
+        "FechaInicioReal",
+        "FechaFinReal",
+        "PorcentajeDeAvance",
+        "HorasPlanificadas",
+        "CantidadReplanificaciones",
+        "KeyProyectoEstado",
+        "KeyProyectoSituacion",
+    ]
+
+    # Auditoría Nivel 2 (Siempre presente)
+    _generate_logs(process, pending_items)
+
+    logging.info(
+        f"⚙️ [{process}] Generada con éxito ({len(df)} registros)."
+    )
+    return df[cols_finales].reset_index(drop=True)
+
 # =============================================================================
 # MAPEO EXPLICITO DE DIMENSIONES CONFORMADAS (.parquet)
 # "clave_origen_en_memoria": "Nombre_Final_Parquet"
@@ -1024,6 +1230,7 @@ FACT_BUILDERS = {
     "FactSeguimientoRecurso": _build_fact_seguimiento_recurso,
     "FactFileInformation":_build_fact_file_information,
     "FactSD":_build_fact_sd,
+    "FactSeguimientoProyectoAcumulado": _build_fact_acumulado_proyectos,
 }
 
 # =============================================================================

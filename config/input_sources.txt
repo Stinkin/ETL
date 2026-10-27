@@ -8,3 +8,4 @@ recurosdisponibilidad|data/raw|Recursos - Disponibilidad.xlsx|UNIQUE
 proyectos|data/raw|DTI 2026 - *.xlsx|LAST
 horas|data/raw|Reporte Kairos *.xlsx|LAST
 servicedesk | data/raw | DTI-Calidad*.xlsx| ALL
+proyAcumu|data/raw|DTI 2026 - *.xlsx|ALL

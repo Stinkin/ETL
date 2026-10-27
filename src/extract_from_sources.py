@@ -35,6 +35,7 @@ ALIAS_TABLAS = {
     "servicedesk_worksheet": "ServiceDesk",
     "archivoproyect":"bajadaproyectos",
     "bajadaasignacion":"RegistroPlanificacion2",
+    "proyAcumu_hoja1":"AcumuladoProyectos"
 }
 
 def read_proyect(mpp_file_path):
@@ -301,9 +302,12 @@ def read_all_files(dataset_key: str, file_list: list[str]) -> dict[str, list[pd.
         return buffer
 
     for file_path in file_list:
+        timestamp = os.path.getmtime(file_path)
+        file_date = pd.to_datetime(timestamp, unit='s').normalize()
         for key_name, df in read_single_file(file_path, dataset_key).items():
-            buffer.setdefault(key_name, []).append(df)
-
+            df_new = df.copy()
+            df_new["FileDate"] = file_date
+            buffer.setdefault(key_name, []).append(df_new)
     return buffer
 
 def build_file_info(input_sources: dict[str, list[str]]) -> pd.DataFrame:
@@ -341,10 +345,12 @@ def extract_all_sources(sources_config: dict[str, list[str]]) -> dict[str, pd.Da
     raw_datasets: dict[str, pd.DataFrame] = {}
     logging.info("--- INICIANDO EXTRACCIÓN MASIVA ---")
 
+    raw_datasets["FactFileInfo"] = build_file_info(sources_config)  
+    
     for dataset_key, files in sources_config.items():
         for key_name, dfs in read_all_files(dataset_key, files).items():
             raw_datasets[key_name] = pd.concat(dfs, ignore_index=True)
-    raw_datasets["FactFileInfo"] = build_file_info(sources_config)   
+ 
     if "RegistroHoras" in raw_datasets:
         raw_datasets["RegistroHoras"] = adjust_registro_horas(raw_datasets["RegistroHoras"])
     logging.info(f"✅ EXTRACCIÓN finalizada. Total de tablas/solapas en memoria: {len(raw_datasets)}")

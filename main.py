@@ -84,6 +84,14 @@ def load_input_sources(config_path: str = os.path.join("config", "input_sources.
 
     return input_sources
 
+def run_proyect_export(input_sources):
+    try:
+        raw_data = extract_all_sources(input_sources)
+        clean_data = clean_dataframes(raw_data)
+        load_all_to_parquet(clean_data, OUTPUT_DIR)
+    except Exception as e:
+        logging.critical(f"💥 Error crítico en el pipeline: {e}", exc_info=True)
+ 
 def run_pipeline(input_sources):
     try:
         logging.info("🚀 === INICIANDO PIPELINE ETL (FASES 1 Y 2) ===")
@@ -111,14 +119,6 @@ def run_pipeline(input_sources):
     except Exception as e:
         logging.critical(f"💥 Error crítico en el pipeline: {e}", exc_info=True)
 
-def run_proyect_export(input_sources):
-    try:
-        raw_data = extract_all_sources(input_sources)
-        clean_data = clean_dataframes(raw_data)
-        load_all_to_parquet(clean_data, OUTPUT_DIR)
-    except Exception as e:
-        logging.critical(f"💥 Error crítico en el pipeline: {e}", exc_info=True)
- 
 
 if __name__ == "__main__":
     _clear_logs()        
