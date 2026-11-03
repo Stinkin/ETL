@@ -2,7 +2,7 @@ import os
 import sys
 import glob
 import logging
-from src.clean_engine import clean_dataframes, capitalize_fields
+from src.clean_engine import clean_dataframes, clean_up_columns
 from src.extract_from_sources import extract_all_sources
 from src.transform_base_dims import transform_base_dimensions
 from src.transform_conf_dims import transform_conformed_dimensions
@@ -84,7 +84,7 @@ def load_input_sources(config_path: str = os.path.join("config", "input_sources.
 
     return input_sources
 
-def run_proyect_export(input_sources):
+def run_proyect_pipeline(input_sources):
     try:
         raw_data = extract_all_sources(input_sources)
         clean_data = clean_dataframes(raw_data)
@@ -106,7 +106,7 @@ def run_pipeline(input_sources):
         audit_homologation_tables(clean_data,data_mart)
         fact_tables = transform_fact_tables(clean_data, data_mart)
         data_mart = data_mart | fact_tables
-        data_mart = capitalize_fields(data_mart)
+        data_mart = clean_up_columns(data_mart)
 
         # Agregar los datos de DEBUG
         #data_mart = data_mart | clean_data
@@ -121,12 +121,18 @@ def run_pipeline(input_sources):
 
 
 if __name__ == "__main__":
-    _clear_logs()        
-    config_csv = os.path.join("config", "input_sources.txt")
+    _clear_logs()    
+    flag = 1
+    if flag == 1:
+        config_csv = os.path.join("config", "input_sources.txt")
+    else:
+        config_csv = os.path.join("config", "extra_sources.txt")
+    
     input_sources = load_input_sources(config_csv)   
     # Solo Proyectos
-    # proy = {"archivoproyect": input_sources.pop("archivoproyect")}
-    # run_proyect_export(proy)
+    if flag == 2:
+        proy = {"archivoproyect": input_sources.pop("archivoproyect")}
+        run_proyect_pipeline(proy)
     # Todo lo demas
     run_pipeline(input_sources)
 
