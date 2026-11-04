@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+from datetime import date
 from src.logs_manager import _generate_logs, _save_structured_audit_csv
 
 def _to_datetime_text(series: pd.Series) -> pd.Series:
@@ -427,7 +428,7 @@ def _build_fact_bolsa_de_horas(clean_data: dict[str, pd.DataFrame], dimensions: 
     ).fillna(0.0)
 
     # 5. Procesamiento de FactRegistroHoras (Consumidas)
-    ANIO_ACTUAL = 2026
+    ANIO_ACTUAL = date.today().year
 
     consumidas_agg = pd.DataFrame({
         "KeyBolsa": pd.Series(dtype="int"),
@@ -918,7 +919,7 @@ def _process_proyect_files( dimensions: dict[str, pd.DataFrame], process: str) -
 
     # 2. Filtrado de registros válidos
     mask_valid = (
-        (df_raw["Proyecto"] != "NO")
+        (df_raw["Proyecto"] != "No")
         & df_raw["Proyecto"].notna()
         & (df_raw["Proyecto"] != "")
     )

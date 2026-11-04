@@ -8,7 +8,7 @@ from src.transform_base_dims import transform_base_dimensions
 from src.transform_conf_dims import transform_conformed_dimensions
 from src.transform_fact_tabl import transform_fact_tables
 from src.audit_homologation_tables import audit_homologation_tables
-from src.load_to_parquet import load_all_to_parquet
+from src.load_to_parquet import load_all_to_parquet, clear_parquets
 from src.logs_manager import _clear_logs
 
 logging.basicConfig(
@@ -112,6 +112,7 @@ def run_pipeline(input_sources):
         #data_mart = data_mart | clean_data
 
         # Export Shopping cart contents
+        clear_parquets(OUTPUT_DIR)
         load_all_to_parquet(data_mart, OUTPUT_DIR)
 
         logging.info("🎉 === FASES COMPLETADAS EXITOSAMENTE ===")
@@ -122,15 +123,15 @@ def run_pipeline(input_sources):
 
 if __name__ == "__main__":
     _clear_logs()    
-    flag = 1
-    if flag == 1:
-        config_csv = os.path.join("config", "input_sources.txt")
-    else:
-        config_csv = os.path.join("config", "extra_sources.txt")
-    
+
+    flag = 1 # a obtener como un parametro en proxima version, por ahora hardcoded
+    config_csv = os.path.join("config", "input_sources.txt")
+    config_csv_extra = os.path.join("config", "extra_sources.txt")
     input_sources = load_input_sources(config_csv)   
     # Solo Proyectos
     if flag == 2:
+        input_sources_extra = load_input_sources(config_csv_extra)   
+        input_sources = input_sources | input_sources_extra
         proy = {"archivoproyect": input_sources.pop("archivoproyect")}
         run_proyect_pipeline(proy)
     # Todo lo demas

@@ -34,7 +34,7 @@ ALIAS_TABLAS = {
     "homologacion_sd":"HomologacionSD",
     "servicedesk_worksheet": "ServiceDesk",
     "archivoproyect":"bajadaproyectos",
-    "bajadaasignacion":"RegistroPlanificacion2",
+    "bajadaasignacion":"RegistroPlanificacion", #Origen alternativo, por proceso del archivo mpp desde el pipeline
     "proyAcumu_hoja1":"AcumuladoProyectos"
 }
 
