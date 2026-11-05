@@ -91,7 +91,7 @@ def _build_fact_registro_horas(clean_data: dict[str, pd.DataFrame], dimensions: 
     df["TempTarea"] = df["Requerimiento"]
 
     # 3. Validación y Mapeo TempRecurso (HomologacionRecurso)
-    df["TempRecurso"] = df["Apeynom"]
+    df["TempRecurso"] = df["Nombre y Apellido"]
 
     # 4. Validación y Mapeo TempEquipo (HomologacionEquipo)
     eq_map = dict(
@@ -114,9 +114,9 @@ def _build_fact_registro_horas(clean_data: dict[str, pd.DataFrame], dimensions: 
     #########################################################################################################
 
     # 5. Cálculo de KeyFecha (Formato YYYYMMDD)
-    anio = df["Periodo"].str[0:4]
-    mes = df["Periodo"].str[5:7]
-    dia = df["Periodo"].str[8:10]
+    anio = df["Periodo (Día)"].str[0:4]
+    mes = df["Periodo (Día)"].str[5:7]
+    dia = df["Periodo (Día)"].str[8:10]
     
     df["KeyFecha"] = (
         (pd.to_numeric(anio, errors="coerce").fillna(1900) * 10000)
@@ -129,7 +129,7 @@ def _build_fact_registro_horas(clean_data: dict[str, pd.DataFrame], dimensions: 
     #########################################################################################################
     # 6. Agrupamiento y Consolidación
     df["HorasConsumidas"] = pd.to_numeric(
-        df["Horas"], errors="coerce"
+        df["Horas Cargadas"], errors="coerce"
     ).fillna(0.0)
 
     df_grouped = (

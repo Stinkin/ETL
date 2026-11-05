@@ -2,6 +2,8 @@ import os
 import sys
 import glob
 import logging
+import argparse
+from datetime import date
 from src.clean_engine import clean_dataframes, clean_up_columns
 from src.extract_from_sources import extract_all_sources
 from src.transform_base_dims import transform_base_dimensions
@@ -19,6 +21,7 @@ logging.basicConfig(
 
 # Directorio de salida
 OUTPUT_DIR = os.path.join("data", "processed")
+
 
 def get_latest_file(pattern_path: str) -> str:
     """
@@ -44,7 +47,7 @@ def get_all_files(pattern_path: str) -> list[str]:
     logging.info(f"🔎 Archivos {pattern_path} detectados para procesar: {len(matching_files)}")
     return matching_files
 
-def load_input_sources(config_path: str = os.path.join("config", "input_sources.txt")) -> dict[str, list[str]]:
+def load_input_sources(config_path: str) -> dict[str, list[str]]:
     """
     Carga la configuración de fuentes desde un archivo TXT separado por '|'.
     """
@@ -77,10 +80,8 @@ def load_input_sources(config_path: str = os.path.join("config", "input_sources.
 
             if mode == "last":
                 input_sources[key] = [get_latest_file(full_pattern)]
-            elif mode == "all":
-                input_sources[key] = get_all_files(full_pattern)               
             else:
-                input_sources[key] = [full_pattern]
+                input_sources[key] = get_all_files(full_pattern)               
 
     return input_sources
 
@@ -124,16 +125,23 @@ def run_pipeline(input_sources):
 if __name__ == "__main__":
     _clear_logs()    
 
-    flag = 1 # a obtener como un parametro en proxima version, por ahora hardcoded
+    parser = argparse.ArgumentParser(description="Parametros del ejecutable del pipeline")
+    #this_year = date.today().year
+    parser.add_argument(
+        "-f", "--full", 
+        action="store_true", 
+        help="Activa la exportacion de proyectos"
+    )
+    #parser.add_argument("-y", "--year", type=int, default=this_year, help="El año a procesar")
+    args = parser.parse_args()
+
     config_csv = os.path.join("config", "input_sources.txt")
     config_csv_extra = os.path.join("config", "extra_sources.txt")
     input_sources = load_input_sources(config_csv)   
-    # Solo Proyectos
-    if flag == 2:
+    if args.full:
         input_sources_extra = load_input_sources(config_csv_extra)   
         input_sources = input_sources | input_sources_extra
         proy = {"archivoproyect": input_sources.pop("archivoproyect")}
         run_proyect_pipeline(proy)
-    # Todo lo demas
     run_pipeline(input_sources)
 

@@ -6,8 +6,8 @@ from pandas.api.types import is_object_dtype, is_string_dtype
 
 def clean_registro_horas(df: pd.DataFrame) -> pd.DataFrame:
 
-    df["Horas"] = (
-        df["Horas"]
+    df["Horas Cargadas"] = (
+        df["Horas Cargadas"]
         .astype(str)
         .str.replace(",", ".", regex=False)
         .astype(float)

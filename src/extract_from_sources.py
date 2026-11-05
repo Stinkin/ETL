@@ -5,6 +5,7 @@ import warnings
 import win32com.client
 
 from datetime import datetime
+from pathlib import Path
 
 ALIAS_TABLAS = {
     "horas_reporte_hs_semanal_-_planning_(": "RegistroHoras",
@@ -48,6 +49,8 @@ def read_proyect(mpp_file_path):
 
     if not os.path.exists(mpp_file_path):
         raise FileNotFoundError(f"The file path {mpp_file_path} does not exist.")
+    relative_path = Path(mpp_file_path)
+    full_path = os.path.abspath(relative_path)
 
     print("Launching MS Project background application...")
     pj_app = win32com.client.Dispatch("MSProject.Application")
@@ -63,7 +66,7 @@ def read_proyect(mpp_file_path):
     task_cache = {}  # Cache to eliminate redundant hierarchical COM lookups
 
     try:
-        pj_app.FileOpen(mpp_file_path)
+        pj_app.FileOpen(full_path)
         pj = pj_app.ActiveProject
 
         def obtener_padre_con_condicion(tsk):
@@ -196,58 +199,26 @@ def read_proyect(mpp_file_path):
     return df
 
 def adjust_registro_horas(df_raw: pd.DataFrame) -> pd.DataFrame:
-    """Ajusta RegistroHoras localizando 'Apeynom' en las filas del DataFrame leído.
-
-    Descarta los metadatos superiores y promueve la fila encontrada como
-    cabecera real.
+    """Ajusta RegistroHoras descartando el último renglón (que no es dato)
+    y agregando la columna de ID secuencial.
     """
-    logging.info("🔧 [Adjust] Corrigiendo estructura de [RegistroHoras]...")
+    logging.info("🔧 [Adjust] Procesando estructura de [RegistroHoras]...")
 
     if df_raw is None or df_raw.empty:
         logging.warning("⚠️ [Adjust] El DataFrame recibido está vacío.")
         return pd.DataFrame()
 
-    # 1. Localizar la fila que contiene 'Apeynom' en la primera columna
-    col_a = df_raw.iloc[:, 0].astype(str).str.strip().str.lower()
-    header_mask = col_a == "apeynom"
+    df = df_raw.copy()
 
-    if not header_mask.any():
-        logging.error(
-            "❌ [Adjust] No se encontró 'Apeynom' en la primera columna del DataFrame."
-        )
-        return pd.DataFrame()
+    # 1. Descartar el último renglón (totales, notas al pie, etc.)
+    if len(df) > 0:
+        df = df.iloc[:-1].copy()
 
-    # argmax() devuelve la posición, que es lo que necesitamos para .iloc
-    header_idx = header_mask.to_numpy().argmax()
-
-    # 2. Extraer y sanitizar la fila de cabecera real
-    raw_headers = df_raw.iloc[header_idx].values
-
-    clean_headers = [
-        str(col).strip()
-        if pd.notna(col) and str(col).strip().lower() != "nan"
-        else f"Columna_{i}"
-        for i, col in enumerate(raw_headers)
-    ]
-
-    # 3. Recortar desde la fila posterior a la cabecera
-    df = df_raw.iloc[header_idx + 1 :].copy()
-    df.columns = clean_headers
-
-    # 4. Eliminar filas con cabeceras repetidas
-    primera_col = df.columns[0]
-
-    df = df[
-        df[primera_col].astype(str).str.strip().str.lower() != "apeynom"
-    ]
-
-    # 5. Reiniciar índice y asignar ID
+    # 2. Reiniciar índice y asignar ID secuencial
     df = df.reset_index(drop=True)
     df.insert(0, "ID", range(1, len(df) + 1))
 
-    logging.info(
-        f"🔧 [Adjust] RegistroHoras reestructurado correctamente ({len(df)} filas)."
-    )
+    logging.info(f"🔧 [Adjust] RegistroHoras procesado correctamente ({len(df)} filas de datos).")
 
     return df
 

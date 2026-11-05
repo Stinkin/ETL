@@ -464,7 +464,7 @@ def _build_dim_requerimiento(clean_data: dict[str, pd.DataFrame], base_dims: dic
     )
 
     if not df_registro.empty and "Requerimiento" in df_registro.columns:
-        df_p2_raw = df_registro[["Requerimiento","Sdreq"]].dropna().copy()
+        df_p2_raw = df_registro[["Requerimiento","SDREQ"]].dropna().copy()
         df_p2_raw = df_p2_raw[df_p2_raw["Requerimiento"] != ""].drop_duplicates()
 
         if not df_fase1.empty:
@@ -483,7 +483,7 @@ def _build_dim_requerimiento(clean_data: dict[str, pd.DataFrame], base_dims: dic
             )
 
             df_p2_new.rename(columns={"Requerimiento": "NombreRequerimiento"}, inplace=True)
-            df_p2_new.rename(columns={"Sdreq": "KeyProyecto"}, inplace=True)
+            df_p2_new.rename(columns={"SDREQ": "KeyProyecto"}, inplace=True)
             df_p2_new["KeyRequerimientoCategoria"] = 0
 
             fase2_items_req = pd.DataFrame({
