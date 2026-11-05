@@ -507,7 +507,7 @@ DimCiclo
 ####  Proceso de carga
 Cada registro válido del catálogo de proyectos genera exactamente un registro en DimProyecto.
 #### Transformaciones
-Solo se procesan los registros cuyo campo "Proyecto" tenga un valor distinto de "NO" y no vacío. Los registros con valor "NO" no representan proyectos y son descartados del proceso.
+Solo se procesan los registros cuyo campo "Proyecto" tenga un valor distinto de "NO" y no vacío. Los registros con valor "NO" en la fuente (valor "No" tras la higiene de datos) no representan proyectos y son descartados del proceso.
 Se almacena el valor de la columna "Cod Proy." en los campos KeyProyecto y Cod Proy.
 Se almacena el valor de la columna "Nombre de tarea" en el campo NombreProyecto. (Representa el proyecto en el sistema origen)
 Se almacena el valor de la columna "Sistemas" en el campo Sistema.
@@ -670,7 +670,7 @@ Aplican Reglas Generales.
 Cada registro válido de BajadaProyectos genera exactamente un registro en FactSeguimientoProyecto.
 #### Transformaciones.
 Se obtiene FechaSnapshot de la fecha y hora de ejecución de la extracción del archivo de Proyectos (FactFileInfo, Alias "Proyectos"). Si no se encuentra, se asigna 0 y se registra el error.
-Solo se procesan los registros cuyo campo "Proyecto" tenga un valor distinto de "NO". Los registros con valor "NO" no representan proyectos y son descartados del proceso.
+Solo se procesan los registros cuyo campo "Proyecto" tenga un valor distinto de "NO". Los registros con valor "NO" en la fuente (valor "No" tras la higiene de datos) no representan proyectos y son descartados del proceso.
 Se almacena el valor de la columna "Cod Proy." en el campo KeyProyecto.
 Se convierte la columna "Comienzo_Programado" (formato dd/mm/aa) a fecha y se almacena en FechaInicioPlan.
 Se convierte la columna "Fin_Programo" (formato dd/mm/aa) a fecha y se almacena en FechaFinPlan.
@@ -690,19 +690,20 @@ Si no, el valor de la columna "Proyecto" se carga en TempEstado
 
 Se busca TempEstado en DimProyectoEstado (columna ProyectoEstado) y se almacena en KeyProyectoEstado
 
-Se determina el valor de KeyProyectoSituacion usando las siguientes reglas en orden:
-- Si PorcentajeDeAvance = 0:
-- - Si (FechaSnapshot > FechaInicioPLan), se carga "Atrasado" en TempSituacion
-- - Si (FechaSnapshot <= FechaInicioPlan), se carga "En Fecha" en TempSituacion.
-- Si PorcentajeDeAvance = 1:
-- - Si (FechaFinReal <= FechaFinPlan), se carga "En Fecha" en TempSituacion.
-- - Si (FechaFinReal > FechaFinPlan), se carga "Atrasado" en TempSituacion.
-- Si 0 < PorcentajeDeAvance < 1:
-- - Si (FechaSnapshot < FechaInicioPlan), se carga "Adelantado" en TempSituacion.
-- - Si (FechaSnapshot > FechaFinPlan), se carga "Atrasado" en TempSituacion.
-- - Sino, se carga "En Fecha" en "TempSituacion"
-- Se busca el valor de TempSituacion en DimProyectoSituacion y se almacena la KeyProyectoSituacion correspondiente.
-- En cualquier otro caso, se almacena 0.
+Se determina el valor de KeyProyectoSituacion a partir del estado ya calculado (TempEstado), sin recalcular reglas de avance. Por defecto se carga "En Fecha" en TempSituacion y se aplican estas excepciones, solo cuando las fechas involucradas son válidas (no vacías):
+- Si el estado es "Sin Iniciar" y FechaSnapshot > FechaInicioPlan, se carga "Demorado" en TempSituacion.
+- Si el estado es "En Proceso" y FechaSnapshot > FechaFinPlan, se carga "Demorado" en TempSituacion.
+- Si el estado es "En Proceso" y FechaSnapshot < FechaInicioPlan, se carga "Adelantado" en TempSituacion.
+- Si el estado es "Terminado" y FechaFinReal > FechaFinPlan, se carga "Demorado" en TempSituacion.
+Se busca el valor de TempSituacion en DimProyectoSituacion y se almacena la KeyProyectoSituacion correspondiente. Si no se encuentra, se almacena 0.
+#### Controles
+**Manejo de errores**
+Aplican Reglas Generales.
+**Precondiciones**
+Aplican Reglas Generales.
+### FactSeguimientoProyectoAcumulado
+#### Definicion
+Misma estructura y mismas reglas que FactSeguimientoProyecto (implementadas una sola vez en `_process_proyect_files`), con dos diferencias: la fuente es la tabla AcumuladoProyectos y FechaSnapshot se obtiene de la fecha de modificación del archivo leído, no de FactFileInfo.
 #### Controles
 **Manejo de errores**
 Aplican Reglas Generales.
@@ -827,13 +828,13 @@ Se obtiene el valor de la columna "Año" en formato YYYY y se almacena directame
 Se obtiene el valor numérico de la columna "Horas" y se almacena en HorasAsignadas.
 
 Se obtiene el valor de KeyProyecto vinculando FactRegistroHoras con DimRequerimiento. Solo se consideran los requerimientos de categoría Proyecto (KeyRequerimientoCategoria = 1).
-Se obtiene el valor de TempTareaAño a partir del año de KeyFecha de FactRegistroHoras. Solo se consideran los registros del año en curso definido en la implementación (2026).
+Se obtiene el valor de TempTareaAño a partir del año de KeyFecha de FactRegistroHoras. Solo se consideran los registros del año en curso (el año de la fecha de ejecución).
 Se consolida FactRegistroHoras agrupando por KeyProyecto y TempTareaAño, sumando las TempHorasProyectoAño.
 Se obtiene KeyDireccion de cada proyecto desde DimProyecto.  
 Se busca KeyDireccion en MapeoDireccionBolsa para obtener KeyBolsa. 
 Se consolidan TempHorasProyectoAño agrupando por KeyBolsa y TempTareaAño, haciendo coincidir este último con el AnioBolsa, y se almacena el resultado+0 en el campo HorasConsumidas
 
-Se obtiene el valor de TempPlanificacionAño a partir del año de KeyFecha de FactAsignacionRecursos. Solo se consideran los registros del año en curso definido en la implementación (2026).
+Se obtiene el valor de TempPlanificacionAño a partir del año de KeyFecha de FactAsignacionRecursos. Solo se consideran los registros del año en curso (el año de la fecha de ejecución).
 Se consolida FactAsignacionRecursos agrupando por KeyProyecto y TempPlanificacionAño, obteniendo TempHorasProgramadasProyecto.
 Se obtiene KeyDireccion de cada proyecto desde DimProyecto.
 Se busca KeyDireccion en MapeoDireccionBolsa y se obtiene KeyBolsa.
@@ -886,5 +887,27 @@ Se almacena la columna "Costo Hora" como numero con dos decimales en CostoPorHor
 #### Controles
 **Manejo de errores**
 Los recursos y equipos sin homologación se informan en Data/FactSeguimientoRecurso_Error.txt, Data/FactSeguimientoRecurso_Recurso_Faltantes.csv, Data/FactSeguimientoRecurso_Equipo_Faltantes.csv y Data/FactSeguimientoRecurso_ROTO_Faltantes.csv (registros descartados).
+**Precondiciones**
+Aplican Reglas Generales.
+
+### FactFileInformation
+#### Definicion
+Registra la información de los archivos fuente leídos en la extracción (tabla FactFileInfo). Se convierten a fecha y hora los campos FechaCreacion, FechaModificacion y FechaSnapshot (formato AAAA-MM-DD HH:MM:SS); los valores que no cumplen el formato quedan vacíos. El resto de las columnas se conserva sin cambios.
+Esta tabla es también la fuente de FechaSnapshot para FactSeguimientoProyecto.
+#### Controles
+**Manejo de errores**
+Aplican Reglas Generales.
+**Precondiciones**
+Aplican Reglas Generales.
+
+### FactSD
+#### Definicion
+Registra los casos de Service Desk (fuente ServiceDesk, archivos DTI-Calidad*.xlsx) con el equipo responsable. Columnas: ID, Tipo, Fecha de cierre, Equipo y Fecha.
+- El Equipo se obtiene de HomologacionSD, uniendo por la columna "Mesa de ayuda". Si el valor no tiene homologación, se carga "None" y se informa en el log.
+- Se eliminan los registros cuyo Equipo homologado es "Filtrar".
+- Fecha se obtiene de "Fecha de cierre". Se aceptan los formatos dd/mm/aaaa, dd/mm/aa y dd/mm/aaaa con hora; los valores no válidos quedan vacíos.
+#### Controles
+**Manejo de errores**
+Si faltan columnas requeridas en ServiceDesk (ID, Tipo, Fecha de cierre, Mesa de ayuda) o en HomologacionSD (Mesa de ayuda, Equipo) se informa un error y no se construye la tabla. Los valores sin homologar no detienen el proceso.
 **Precondiciones**
 Aplican Reglas Generales.

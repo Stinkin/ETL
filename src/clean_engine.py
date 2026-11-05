@@ -1,6 +1,8 @@
 import pandas as pd
 import re
 import logging
+from pandas.api.types import is_object_dtype, is_string_dtype
+
 
 def clean_registro_horas(df: pd.DataFrame) -> pd.DataFrame:
 
@@ -31,12 +33,12 @@ def sanitize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     # 2. Erradicar el tipo 'object' inicial
     # Se llenan nulos con cadena vacía ANTES de convertir, para evitar inyectar pd.NA
-    object_cols = df_clean.select_dtypes(include=['object']).columns
+    object_cols = [c for c, dt in df_clean.dtypes.items() if is_object_dtype(dt)]
     for col in object_cols:
         df_clean[col] = df_clean[col].astype("string").fillna("")
 
     # 3. Normalización de columnas de texto (ahora identificadas como 'string')
-    string_cols = df_clean.select_dtypes(include=['string']).columns
+    string_cols = [c for c, dt in df_clean.dtypes.items() if is_string_dtype(dt)]
     for col in string_cols:
         s = (
             df_clean[col]

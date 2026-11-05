@@ -38,8 +38,9 @@ Al iniciar `main.py` se limpia la carpeta `Data` (`_clear_logs`), se cargan las 
 4. `transform_conf_dims.transform_conformed_dimensions`: Construye las dimensiones conformadas sobre las dimensiones base.
 5. `audit_homologation_tables.audit_homologation_tables`: Audita las homologaciones contra las dimensiones.
 6. `transform_fact_tabl.transform_fact_tables`: Construye las tablas de hechos.
-7. `clean_engine.capitalize_fields`: Convierte a mayúsculas las columnas definidas.
-8. `load_to_parquet.load_all_to_parquet`: Exporta todas las tablas a `data/processed`.
+7. `clean_engine.clean_up_columns`: Aplica `capitalize_fields` (mayúsculas en las columnas definidas) y `capitalize_specific_words` (siglas OV, SAR, SAP, BI y AYSA).
+8. `load_to_parquet.clear_parquets`: Elimina los `.parquet` previos de `data/processed` (conserva `bajadaproyectos.parquet`).
+9. `load_to_parquet.load_all_to_parquet`: Exporta todas las tablas a `data/processed`.
 Las dimensiones base, las dimensiones conformadas y las tablas de hechos se reúnen en un único conjunto de tablas (data mart) y se exportan juntas. Las tablas auxiliares (mapeos, homologaciones, TablaRecursos, TablaCapacity, etc.) no se exportan.
 ## Modulos
 ### main.py
@@ -50,6 +51,7 @@ Punto de entrada. Carga la configuración de fuentes y ejecuta el pipeline compl
 `main.py`
 **Constantes**
 `OUTPUT_DIR` = `data/processed`.
+`flag` (en el bloque principal, valor fijo en el código): 1 = ejecución normal; 2 = ejecuta además el paso de proyectos con las fuentes de `extra_sources.txt`.
 #### Funciones
 | Función | Argumentos | Retorno | Descripción |
 | ------- | ---------- | ------- | ----------- |
@@ -57,7 +59,7 @@ Punto de entrada. Carga la configuración de fuentes y ejecuta el pipeline compl
 | `get_all_files` | `pattern_path: str` | `list[str]` | Devuelve todas las rutas que coinciden con el patrón, ordenadas por fecha de modificación ascendente. Lista vacía si no hay coincidencias. |
 | `load_input_sources` | `config_path: str = os.path.join('config', 'input_sources.txt')` | `dict[str, list[str]]` | Lee el archivo de configuración (separador `\|`, columnas `key`, `folder`, `filename_pattern`, `mode`) y devuelve un diccionario `{key: [rutas]}`. Con `mode` = LAST usa `get_latest_file`, con ALL usa `get_all_files` y con cualquier otro valor (UNIQUE) usa el patrón tal cual. Si el archivo de configuración no existe finaliza el proceso. |
 | `run_pipeline` | `input_sources` | — | Orquesta el pipeline completo (ver Flujo de Ejecución). Cualquier excepción se registra como error crítico y no se propaga. |
-| `run_proyect_export` | `input_sources` | — | Exporta a Parquet las fuentes limpias sin transformarlas (uso manual para archivos de Project). Su invocación está comentada en el bloque principal. |
+| `run_proyect_pipeline` | `input_sources` | — | Extrae, limpia y exporta a Parquet las fuentes recibidas sin transformarlas (uso para archivos de Project). Con `flag` = 2 se ejecuta solo con `archivoproyect`, antes de `run_pipeline`; las tablas del pipeline completo sobrescriben las que haya generado. Cualquier excepción se registra como error crítico y no se propaga. |
 ### extract_from_sources.py
 #### Definicion
 **Objetivo**
@@ -88,11 +90,11 @@ Limpieza e higiene de datos antes y después de las transformaciones.
 | Función | Argumentos | Retorno | Descripción |
 | ------- | ---------- | ------- | ----------- |
 | `clean_registro_horas` | `df: pd.DataFrame` | `pd.DataFrame` | Convierte la columna `Horas` a numérico (la coma decimal se reemplaza por punto). |
-| `sanitize_dataframe` | `df: pd.DataFrame` | `pd.DataFrame` | Aplica la higiene de datos descripta en Modelo ETL: limpia encabezados, elimina filas vacías y duplicados exactos, normaliza texto a formato Título, reemplaza nulos de texto por cadena vacía y nulos numéricos por 0. |
+| `sanitize_dataframe` | `df: pd.DataFrame` | `pd.DataFrame` | Aplica la higiene de datos descripta en Modelo ETL: limpia encabezados, elimina filas vacías y duplicados exactos, normaliza texto a formato Título (toda comparación de texto posterior debe usar ese formato: "No", "Si"; nunca "NO"), reemplaza nulos de texto por cadena vacía y nulos numéricos por 0. |
 | `clean_dataframes` | `raw_data: dict[str, pd.DataFrame]` | `dict[str, pd.DataFrame]` | Aplica `sanitize_dataframe` a cada tabla extraída (las vacías se conservan como DataFrame vacío) y `clean_registro_horas` a RegistroHoras. Consume el diccionario de entrada. |
-| `capitalize_fields` | `input_df: dict[str, pd.DataFrame]` | `dict[str, pd.DataFrame]` | Convierte a mayúsculas las columnas definidas del modelo final (ver Modelo ETL, Higiene de Datos). Se ejecuta sobre el data mart antes de exportar. |
-| `capitalize_specific_words` | `input_df: dict[str, pd.DataFrame]` | `dict[str, pd.DataFrame]` | Fuerza a mayúsculas las siglas OV, SAR, SAP, BI y AYSA en DimProyecto, DimTarea y DimRequerimiento. No es invocada por `main.py`. |
-| `clean_up_columns` | `input_df: dict[str, pd.DataFrame]` | `dict[str, pd.DataFrame]` | Aplica `capitalize_fields` y `capitalize_specific_words` sobre una copia del diccionario. No es invocada por `main.py`. |
+| `capitalize_fields` | `input_df: dict[str, pd.DataFrame]` | `dict[str, pd.DataFrame]` | Convierte a mayúsculas las columnas definidas del modelo final (ver Modelo ETL, Higiene de Datos). Es invocada por `clean_up_columns`. |
+| `capitalize_specific_words` | `input_df: dict[str, pd.DataFrame]` | `dict[str, pd.DataFrame]` | Fuerza a mayúsculas las siglas OV, SAR, SAP, BI y AYSA en DimProyecto, DimTarea y DimRequerimiento. Es invocada por `clean_up_columns`. |
+| `clean_up_columns` | `input_df: dict[str, pd.DataFrame]` | `dict[str, pd.DataFrame]` | Aplica `capitalize_fields` y `capitalize_specific_words` sobre una copia del diccionario. Es la función que invoca `main.py` sobre el data mart antes de exportar. |
 ### transform_base_dims.py
 #### Definicion
 **Objetivo**
@@ -146,15 +148,17 @@ Tablas de hechos.
 **Ruta**
 `src/transform_fact_tabl.py`
 **Constantes**
-`FACT_BUILDERS` define el orden de construcción: FactSeguimientoProyecto, FactRegistroHoras, FactAsignacionRecursos, FactBolsaDeHoras, FactSeguimientoRecurso, FactFileInformation y FactSD.
-`ANIO_ACTUAL` (definida dentro de `_build_fact_bolsa_de_horas`) = 2026. Limita las horas consumidas y programadas al año vigente.
+`FACT_BUILDERS` define el orden de construcción: FactSeguimientoProyecto, FactRegistroHoras, FactAsignacionRecursos, FactBolsaDeHoras, FactSeguimientoRecurso, FactFileInformation, FactSD y FactSeguimientoProyectoAcumulado.
+`ANIO_ACTUAL` (definida dentro de `_build_fact_bolsa_de_horas`) = año de la fecha de ejecución (`date.today().year`). Limita las horas consumidas y programadas a ese año.
 `CLAVE`, `COLS_RAW`, `COL_MAP`, `SIN_MATCH` y `EQUIPO_EXCLUIDO` (definidas dentro de `_build_fact_sd`): "Mesa de ayuda"; ["ID", "Tipo", "Fecha de cierre"]; "Equipo"; "None"; "Filtrar".
 #### Funciones
 | Función | Argumentos | Retorno | Descripción |
 | ------- | ---------- | ------- | ----------- |
 | `_to_datetime_text` | `series: pd.Series` | `pd.Series` | Elimina el texto previo al primer espacio de cada valor (por ejemplo, el día de la semana) y convierte el resto, con formato dd/mm/aa, a fecha. Los valores no interpretables quedan vacíos. |
-| `_to_datetime` | `series: pd.Series` | `pd.Series` | Normaliza fechas con formato d/m/aa o d/m/aaaa (se ignora la hora o el texto posterior a una coma o espacio) y las convierte a fecha con día primero. Los valores no interpretables quedan vacíos. |
-| `_build_fact_seguimiento_proyecto` | `clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]` | `pd.DataFrame` | Construye FactSeguimientoProyecto desde BajadaProyectos (fechas, horas, avance, estado y situación). |
+| `_to_datetimeSD` | `series: pd.Series` | `pd.Series` | Normaliza fechas con formato d/m/aa o d/m/aaaa (se ignora la hora o el texto posterior a una coma o espacio) y las convierte a fecha con día primero. Los valores no interpretables quedan vacíos. |
+| `_build_fact_seguimiento_proyecto` | `clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]` | `pd.DataFrame` | Construye FactSeguimientoProyecto desde BajadaProyectos. Obtiene FechaSnapshot de FactFileInfo (Alias `Proyectos`); si no la encuentra usa 0 y lo informa en el archivo de auditoría. Delega el cálculo en `_process_proyect_files`. |
+| `_build_fact_acumulado_proyectos` | `clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]` | `pd.DataFrame` | Construye FactSeguimientoProyectoAcumulado desde AcumuladoProyectos (fuente `proyAcumu`, hoja 1). FechaSnapshot proviene de la fecha de modificación de cada archivo leído. Delega el cálculo en `_process_proyect_files`. |
+| `_process_proyect_files` | `dimensions: dict[str, pd.DataFrame], process: str` | `pd.DataFrame` | Cálculo compartido por FactSeguimientoProyecto y FactSeguimientoProyectoAcumulado. Recibe `Proyectos`, `DimProyectoEstado` y `DimProyectoSituacion`. Descarta los registros cuyo `Proyecto` sea "No" o vacío; convierte fechas, horas planificadas y avance; calcula KeyProyectoEstado y KeyProyectoSituacion (ver Modelo ETL, FactSeguimientoProyecto). Devuelve KeyProyecto, FechaSnapshot, FechaInicioPlan, FechaFinPlan, FechaInicioReal, FechaFinReal, PorcentajeDeAvance, HorasPlanificadas, CantidadReplanificaciones, KeyProyectoEstado y KeyProyectoSituacion. |
 | `_build_fact_registro_horas` | `clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]` | `pd.DataFrame` | Construye FactRegistroHoras desde RegistroHoras, resolviendo recurso por HomologacionRecurso y requerimiento por DimRequerimiento. Las claves no resueltas se cargan con 0 y se informan. |
 | `_build_fact_asignacion_recursos` | `clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]` | `pd.DataFrame` | Construye FactAsignacionRecursos desde RegistroPlanificacion (minutos a horas, claves de tarea, proyecto, recurso y fecha). |
 | `_build_fact_bolsa_de_horas` | `clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd.DataFrame]` | `pd.DataFrame` | Construye FactBolsaDeHoras consolidando horas asignadas (AsignacionBolsa), consumidas (FactRegistroHoras) y programadas (FactAsignacionRecursos) por bolsa y año. |
@@ -173,6 +177,7 @@ Carga: exportación de todas las tablas a Parquet.
 | Función | Argumentos | Retorno | Descripción |
 | ------- | ---------- | ------- | ----------- |
 | `load_all_to_parquet` | `processed_datasets: dict[str, pd.DataFrame], output_dir: str` | `None` | Exporta cada tabla como `<nombre>.parquet` (pyarrow, compresión snappy, sin índice) en el directorio indicado. Un error en una tabla se registra y no detiene las demás. |
+| `clear_parquets` | `directory` | `None` | Elimina los `.parquet` del directorio indicado, excepto `bajadaproyectos.parquet` (salida del paso de proyectos y entrada de `bajadaasignacion`). Se invoca justo antes de `load_all_to_parquet`, de modo que la carpeta contiene siempre el resultado de la última ejecución completa. Si algún archivo está bloqueado (abierto en Power BI) informa los archivos y finaliza el proceso. |
 ### logs_manager.py
 #### Definicion
 **Objetivo**
@@ -193,8 +198,10 @@ Los módulos escriben en la carpeta `Data`, que se limpia al iniciar cada ejecuc
 | `<Modulo>_Faltantes.csv` | `_save_structured_audit_csv` | Registros que requieren acción manual (separador `;`, UTF-8 con BOM). Incluye DimRequerimiento_Faltantes y DimTarea_Faltantes (nuevos a clasificar) y los faltantes de homologación de las tablas de hechos. |
 El docstring de `_build_dim_recurso` menciona `Error_DimRecurso.txt`; el nombre real generado es `DimRecurso_Error.txt`.
 ## Observaciones de Implementacion
-- `clean_up_columns` y `capitalize_specific_words` existen en `clean_engine.py` pero no forman parte del pipeline.
-- `run_proyect_export` espera la key `archivoproyect`, que no figura en `input_sources.txt`; su uso requiere cargar `extra_sources.txt` manualmente.
+- Después de `sanitize_dataframe` todo el texto está en formato Título: las comparaciones de texto deben usar `"No"` y `"Si"`, no `"NO"` ni `"SI"`.
+- `run_proyect_pipeline` espera la key `archivoproyect`, que figura solo en `extra_sources.txt`. Se activa con `flag == 2`, valor fijo en `main.py` pendiente de convertir en parámetro de ejecución.
+- `bajadaproyectos.parquet` es salida del paso de proyectos y entrada de `bajadaasignacion`; `clear_parquets` lo conserva.
+- `clear_parquets` se ejecuta dentro de `run_pipeline`, justo antes de `load_all_to_parquet`. Si la corrida falla antes de ese punto, los parquet de `data/processed` son los de la corrida anterior.
 - `FactFileInfo` es una tabla de origen generada en la extracción; se publica como `FactFileInformation`.
 - `FactSD` y `FactFileInformation` no cuentan con definición funcional en Modelo Dimensional ni en Modelo ETL.
 - Las rutas `Data` (auditoría) y `data/processed` (salida) se resuelven de forma relativa al directorio de ejecución.

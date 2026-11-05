@@ -110,7 +110,10 @@ Activo: si el recurso se encontro activo durante ese mes.
 Cada fila representa el estado de un proyecto durante una semana determinada.
 
 #### Tabla de Hechos
-FactSeguimientoProyecto
+FactSeguimientoProyecto  
+FactSeguimientoProyectoAcumulado
+
+FactSeguimientoProyectoAcumulado tiene el mismo grano, dimensiones y hechos que FactSeguimientoProyecto. Se alimenta del acumulado de proyectos y su FechaSnapshot es la fecha del archivo leído.
 
 #### Dimensiones
 DimProyecto  
@@ -251,11 +254,15 @@ UsuarioClave
 
 Representa el estado operativo del proyecto, informa un valor de proceso
 
+El ETL asigna los valores "Sin Iniciar", "En Proceso" y "Terminado". Deben existir en esta dimensión (ver Modelo ETL, FactSeguimientoProyecto).
+
 KeyProyectoEstado
 NombreProyectoEstado
 #### DimProyectoSituacion
 
 Representa la situacion del proyecto, informa un valor cualitativo.
+
+El ETL asigna los valores "En Fecha", "Demorado" y "Adelantado". Deben existir en esta dimensión; si falta alguno, los proyectos correspondientes quedan con KeyProyectoSituacion = 0 (ver Modelo ETL, FactSeguimientoProyecto).
 
 KeyProyectoSituacion
 NombreProyectoSituacion
