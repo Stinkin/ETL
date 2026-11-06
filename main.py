@@ -3,6 +3,7 @@ import sys
 import glob
 import logging
 import argparse
+import src.config as config
 from datetime import date
 from src.clean_engine import clean_dataframes, clean_up_columns
 from src.extract_from_sources import extract_all_sources
@@ -18,10 +19,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
-
-# Directorio de salida
-OUTPUT_DIR = os.path.join("data", "processed")
-
 
 def get_latest_file(pattern_path: str) -> str:
     """
@@ -89,7 +86,7 @@ def run_proyect_pipeline(input_sources):
     try:
         raw_data = extract_all_sources(input_sources)
         clean_data = clean_dataframes(raw_data)
-        load_all_to_parquet(clean_data, OUTPUT_DIR)
+        load_all_to_parquet(clean_data, config.OUTPUT_DIR)
     except Exception as e:
         logging.critical(f"💥 Error crítico en el pipeline: {e}", exc_info=True)
  
@@ -113,8 +110,8 @@ def run_pipeline(input_sources):
         #data_mart = data_mart | clean_data
 
         # Export Shopping cart contents
-        clear_parquets(OUTPUT_DIR)
-        load_all_to_parquet(data_mart, OUTPUT_DIR)
+        clear_parquets(config.OUTPUT_DIR)
+        load_all_to_parquet(data_mart, config.OUTPUT_DIR)
 
         logging.info("🎉 === FASES COMPLETADAS EXITOSAMENTE ===")
 
@@ -123,8 +120,7 @@ def run_pipeline(input_sources):
 
 
 if __name__ == "__main__":
-    _clear_logs()    
-
+    _clear_logs(config.LOGS_DIR)    
     parser = argparse.ArgumentParser(description="Parametros del ejecutable del pipeline")
     #this_year = date.today().year
     parser.add_argument(
@@ -135,8 +131,8 @@ if __name__ == "__main__":
     #parser.add_argument("-y", "--year", type=int, default=this_year, help="El año a procesar")
     args = parser.parse_args()
 
-    config_csv = os.path.join("config", "input_sources.txt")
-    config_csv_extra = os.path.join("config", "extra_sources.txt")
+    config_csv = os.path.join(config.CONFIG_DIR, "input_sources.txt")
+    config_csv_extra = os.path.join(config.CONFIG_DIR, "extra_sources.txt")
     input_sources = load_input_sources(config_csv)   
     if args.full:
         input_sources_extra = load_input_sources(config_csv_extra)   

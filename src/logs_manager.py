@@ -1,16 +1,17 @@
 import pandas as pd
 import csv
-from pathlib import Path
 import logging
 import sys 
+import src.config as config
+from pathlib import Path
 
-def _clear_logs() -> None:
+def _clear_logs(dir_to_clean) -> None:
     """Limpia el directorio Data.
 
     Si algún archivo está bloqueado, interrumpe el pipeline lanzando una
     excepción personalizada de negocio.
     """
-    data_dir = Path("Data")
+    data_dir = Path(dir_to_clean)
 
     if not data_dir.exists():
         return
@@ -35,11 +36,11 @@ def _clear_logs() -> None:
         sys.exit()
 
 def _generate_logs(module_name: str, pending_items: list[str]) -> None:
-    data_dir = Path("Data")
-    data_dir.mkdir(exist_ok=True)
+    logs_dir = Path(config.LOGS_DIR)
+    logs_dir.mkdir(exist_ok=True)
 
     status = "Error" if pending_items else "OK"
-    filepath = data_dir / f"{module_name}_{status}.txt"
+    filepath = logs_dir / f"{module_name}_{status}.txt"
 
     with filepath.open("w", encoding="utf-8") as f:
         f.write(f"REGISTROS PENDIENTES DE CORRECCIÓN - {module_name.upper()}\n")
@@ -62,7 +63,7 @@ def _save_structured_audit_csv(module_name: str, df: pd.DataFrame) -> None:
             f"esperaba un pd.DataFrame, pero recibió: {type(df).__name__}."
         )
 
-    data_dir = Path("Data")
+    data_dir = Path(config.LOGS_DIR)
     data_dir.mkdir(parents=True, exist_ok=True)
 
     filepath = data_dir / f"{module_name}_Faltantes.csv"
@@ -77,6 +78,3 @@ def _save_structured_audit_csv(module_name: str, df: pd.DataFrame) -> None:
         )
         msg = f"Archivo de faltantes generado con {len(df)} registros."
         logging.warning(f" ⚠️ [{module_name}] {msg}")
-
-
-    
