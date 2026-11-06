@@ -4,6 +4,6 @@ openpyxl>=3.1.0
 
 ordered-set
 pyinstaller
-nuitka >= 4.3.1
+nuitka >= 4.3.4
 Nuitka[onefile]
 pywin32 

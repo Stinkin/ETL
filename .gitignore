@@ -4,6 +4,12 @@ __pycache__/
 venv/
 .vscode/
 
+main.build/
+main.dist/
+main.onefile-build/
+
+main.exe
+
 # Ignorar archivos de datos pesados
 data/raw/*
 !data/raw/.gitkeep

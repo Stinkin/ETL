@@ -14,7 +14,7 @@ Procesa los archivos fuente (Excel, CSV, Parquet y MS Project) y genera dimensio
 python main.py
 ```
 
-1. Limpia los archivos de auditoría de `Data/`.
+1. Limpia los archivos de auditoría de `data/`.
 2. Lee las fuentes de `config/input_sources.txt`, limpia, construye dimensiones y hechos.
 3. Justo antes de escribir, borra los `.parquet` anteriores de `data/processed/` (conserva `bajadaproyectos.parquet`) y escribe los nuevos.
 
@@ -23,7 +23,7 @@ Si algún archivo está abierto en Excel o Power BI, la corrida se detiene y lo 
 ## Cómo saber si salió bien
 
 - La consola termina con `FASES COMPLETADAS EXITOSAMENTE` solo si no hubo un error crítico. Un archivo faltante o una tabla vacía aparecen como advertencias en la consola, así que conviene leerla.
-- Revisar la carpeta `Data/`: los archivos `*_Error.txt` y `*_Faltantes.csv` listan lo que requiere corrección manual (los `*_OK.txt` indican que no hubo desvíos).
+- Revisar la carpeta `data/`: los archivos `*_Error.txt` y `*_Faltantes.csv` listan lo que requiere corrección manual (los `*_OK.txt` indican que no hubo desvíos).
 - Los parquet anteriores se borran recién al llegar a la carga. Si la consola muestra `Error crítico` antes de ese punto, los parquet de `data/processed/` son los de la corrida anterior.
 
 ## Estructura
@@ -36,7 +36,7 @@ Si algún archivo está abierto en Excel o Power BI, la corrida se detiene y lo 
 | `config/extra_sources.txt` | Fuentes del paso de proyectos (`.mpp`); no se cargan en la ejecución normal |
 | `data/raw/` | Archivos de origen |
 | `data/processed/` | Parquet generados (los consume Power BI) |
-| `Data/` | Archivos de auditoría de la última corrida |
+| `data/` | Archivos de auditoría de la última corrida |
 | `docs/` | Documentación del modelo |
 
 ## Tests
