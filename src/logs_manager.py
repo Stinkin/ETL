@@ -5,13 +5,13 @@ import sys
 import src.config as config
 from pathlib import Path
 
-def _clear_logs(dir_to_clean) -> None:
+def _clear_logs() -> None:
     """Limpia el directorio Data.
 
     Si algún archivo está bloqueado, interrumpe el pipeline lanzando una
     excepción personalizada de negocio.
     """
-    data_dir = Path(dir_to_clean)
+    data_dir = Path(config.LOGS_DIR)
 
     if not data_dir.exists():
         return
@@ -37,7 +37,7 @@ def _clear_logs(dir_to_clean) -> None:
 
 def _generate_logs(module_name: str, pending_items: list[str]) -> None:
     logs_dir = Path(config.LOGS_DIR)
-    logs_dir.mkdir(exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
     status = "Error" if pending_items else "OK"
     filepath = logs_dir / f"{module_name}_{status}.txt"

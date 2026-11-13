@@ -28,8 +28,8 @@ def get_latest_file(pattern_path: str) -> str:
     matching_files = glob.glob(pattern_path)
     if not matching_files:
         logging.warning(f"⚠️ No se encontraron archivos con el patrón: '{pattern_path}'")
-        return pattern_path
-    
+        return ""
+        
     latest_file = max(matching_files, key=os.path.getmtime)
     logging.info(f"🔎 Archivo detectado más reciente: {latest_file}")
     return latest_file
@@ -120,7 +120,6 @@ def run_pipeline(input_sources):
 
 
 if __name__ == "__main__":
-    _clear_logs(config.LOGS_DIR)    
     parser = argparse.ArgumentParser(description="Parametros del ejecutable del pipeline")
     #this_year = date.today().year
     parser.add_argument(
@@ -130,6 +129,8 @@ if __name__ == "__main__":
     )
     #parser.add_argument("-y", "--year", type=int, default=this_year, help="El año a procesar")
     args = parser.parse_args()
+    # NO se borra el log con  --help o un parametro roto
+    _clear_logs()    
 
     config_csv = os.path.join(config.CONFIG_DIR, "input_sources.txt")
     config_csv_extra = os.path.join(config.CONFIG_DIR, "extra_sources.txt")
@@ -140,4 +141,3 @@ if __name__ == "__main__":
         proy = {"archivoproyect": input_sources.pop("archivoproyect")}
         run_proyect_pipeline(proy)
     run_pipeline(input_sources)
-

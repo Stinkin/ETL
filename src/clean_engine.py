@@ -97,16 +97,17 @@ def clean_dataframes(raw_data: dict[str, pd.DataFrame]) -> dict[str, pd.DataFram
 
 def capitalize_fields(input_df:dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     cols_to_upper = {
-        "DimCiclo": {"Ciclo",},
-        "DimDireccion": {"Direccion", },
-        "DimEquipo": {"Equipo","Gerencia"},
-        "DimProyecto": {"Cod Proy.","KeyProyecto","Sistema"},
-        "DimTarea":{"KeyProyecto"},
-        "DimRecursoOrigen":{"RecursoOrigen"},
-        "FactSeguimientoProyecto":{"KeyProyecto"},
-        "FactSeguimientoProyectoAcumulado":{"KeyProyecto"},
-        "FactSD":{"Equipo"},
-    }
+            "DimCiclo": {"Ciclo",},
+            "DimDireccion": {"Direccion", },
+            "DimEquipo": {"Equipo", "Gerencia"},
+            "DimProyecto": {"Cod Proy.", "KeyProyecto", "Sistema"},
+            "DimTarea": {"KeyProyecto"},
+            "DimRequerimiento": {"KeyProyecto"},
+            "FactAsignacionRecursos": {"KeyProyecto"}, 
+            "FactSeguimientoProyecto": {"KeyProyecto"},
+            "FactSeguimientoProyectoAcumulado": {"KeyProyecto"},
+            "FactSD": {"Equipo"},
+        }
 
     # Apply row-value capitalization
     for df_key, columns in cols_to_upper.items():
@@ -126,9 +127,9 @@ def capitalize_specific_words(input_df: dict[str, pd.DataFrame]) -> dict[str, pd
     
     # 2. Configuramos el mapeo: { "DataFrame": ["columna1", "columna2", ...] }
     targets = {
-        "DimProyecto": ["Nombre Proyecto"],
-        "DimTarea": ["Tarea"],
-        "DimRequerimiento": ["Requerimiento"]
+        "DimProyecto": ["NombreProyecto"],
+        "DimTarea": ["NombreTarea"],
+        "DimRequerimiento": ["NombreRequerimiento"]
     }
     
     # Compilamos las expresiones regulares una sola vez para mejorar el rendimiento

@@ -16,6 +16,7 @@ echo [INFO] Forcing UTF-8 mode and utilizing system-native Windows Runtimes...
 python -m nuitka ^
     --standalone ^
     --onefile ^
+    --remove-output ^
     --windows-console-mode=force ^
     --nofollow-import-to=pandas.tests ^
     --lto=no ^

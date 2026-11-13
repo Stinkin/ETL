@@ -817,7 +817,7 @@ def _build_fact_sd(clean_data: dict[str, pd.DataFrame], dimensions: dict[str, pd
     faltan_map = [c for c in (CLAVE, COL_MAP) if c not in df_map.columns]
     if faltan_raw or faltan_map:
         raise KeyError(
-            f"[FactSeguimientoRecurso] columnas faltantes. "
+            f"[FactSD] columnas faltantes. "
             f"ServiceDesk: {faltan_raw} | HomologacionSD: {faltan_map}"
         )
 

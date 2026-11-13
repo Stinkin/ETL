@@ -199,8 +199,8 @@ def read_proyect(mpp_file_path):
     return df
 
 def adjust_registro_horas(df_raw: pd.DataFrame) -> pd.DataFrame:
-    """Ajusta RegistroHoras descartando el último renglón (que no es dato)
-    y agregando la columna de ID secuencial.
+    """Ajusta RegistroHoras descartando el último renglón solo si 
+    contiene texto de totales y agregando la columna de ID secuencial.
     """
     logging.info("🔧 [Adjust] Procesando estructura de [RegistroHoras]...")
 
@@ -210,9 +210,16 @@ def adjust_registro_horas(df_raw: pd.DataFrame) -> pd.DataFrame:
 
     df = df_raw.copy()
 
-    # 1. Descartar el último renglón (totales, notas al pie, etc.)
+    # 1. Descartar el último renglón SOLO SI contiene "TOTAL HORAS"
     if len(df) > 0:
-        df = df.iloc[:-1].copy()
+        # Convertimos los valores del último renglón a string y buscamos "TOTAL HORAS" (mayúsculas/minúsculas)
+        ultimo_renglon_str = df.iloc[-1].astype(str).str.upper()
+        
+        if any(ultimo_renglon_str.str.contains("TOTAL HORAS", na=False)):
+            df = df.iloc[:-1].copy()
+            logging.info("🧹 [Adjust] Línea de 'TOTAL HORAS' detectada y descartada.")
+        else:
+            logging.info("ℹ️ [Adjust] No se encontró la línea de totales; se conservan todas las filas.")
 
     # 2. Reiniciar índice y asignar ID secuencial
     df = df.reset_index(drop=True)

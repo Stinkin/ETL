@@ -97,7 +97,7 @@ def _audit_homologacion_direccion(clean_data: dict[str, pd.DataFrame], data_mart
     return True
 
 def _audit_homologacion_equipo(clean_data: dict[str, pd.DataFrame], data_mart: dict[str, pd.DataFrame]) -> bool:
-    logging.info("⚙️ Auditando [HomologacionDireccion]...")
+    logging.info("⚙️ Auditando [HomologacionEquipo]...")
     pending_items: list[str] = []
     
     df_homolog = clean_data.get("HomologacionEquipo", pd.DataFrame())
